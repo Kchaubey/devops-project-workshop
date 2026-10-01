@@ -1,0 +1,31 @@
+// Detect a failed job with no successful recovery inside the recovery window.
+
+let lookback = 24h;
+let recoveryWindow = 30m;
+
+let events =
+    DatabricksJobs
+    | where TimeGenerated >= ago(lookback)
+    | extend
+        JobId = tostring(column_ifexists("JobId", "")),
+        JobName = tostring(column_ifexists("JobName", "")),
+        RunId = tostring(column_ifexists("RunId", "")),
+        ActionName = tostring(column_ifexists("ActionName", ""));
+
+let latestFailure =
+    events
+    | where ActionName == "runFailed"
+    | summarize arg_max(TimeGenerated, *) by JobId
+    | project JobId, JobName, LastFailureTime = TimeGenerated, LastFailedRunId = RunId;
+
+let latestSuccess =
+    events
+    | where ActionName == "runSucceeded"
+    | summarize LastSuccessTime = max(TimeGenerated) by JobId;
+
+latestFailure
+| join kind=leftouter latestSuccess on JobId
+| extend RecoveryStatus = iff(isnull(LastSuccessTime) or LastSuccessTime < LastFailureTime, "NotRecovered", "Recovered")
+| where RecoveryStatus == "NotRecovered"
+| where now() - LastFailureTime >= recoveryWindow
+| project JobId, JobName, LastFailureTime, LastFailedRunId, LastSuccessTime, RecoveryStatus
