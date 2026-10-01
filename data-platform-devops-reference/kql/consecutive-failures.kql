@@ -1,0 +1,34 @@
+// Detect repeated job failures since the latest successful run.
+// Return one row per affected job.
+// Suggested Azure Monitor condition: Number of results > 0.
+
+let lookback = 48h;
+let requiredFailures = 3;
+
+let events =
+    DatabricksJobs
+    | where TimeGenerated >= ago(lookback)
+    | extend
+        JobId = tostring(column_ifexists("JobId", "")),
+        JobName = tostring(column_ifexists("JobName", "")),
+        RunId = tostring(column_ifexists("RunId", "")),
+        ActionName = tostring(column_ifexists("ActionName", "")),
+        ResourceId = tostring(column_ifexists("_ResourceId", column_ifexists("ResourceId", "")));
+
+let latestSuccess =
+    events
+    | where ActionName == "runSucceeded"
+    | summarize LastSuccessTime = max(TimeGenerated) by JobId;
+
+let failures =
+    events
+    | where ActionName == "runFailed"
+    | summarize FailureCount = count(), LastFailureTime = max(TimeGenerated), LastRunId = arg_max(TimeGenerated, RunId) by JobId, JobName, ResourceId;
+
+failures
+| join kind=leftouter latestSuccess on JobId
+| extend Cutoff = coalesce(LastSuccessTime, ago(lookback))
+| where LastFailureTime > Cutoff
+| where FailureCount >= requiredFailures
+| project JobId, JobName, FailureCount, LastFailureTime, LastRunId, LastSuccessTime, ResourceId
+| order by FailureCount desc, LastFailureTime desc
