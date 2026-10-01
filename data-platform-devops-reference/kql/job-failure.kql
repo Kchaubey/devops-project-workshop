@@ -1,0 +1,15 @@
+// Recent Databricks job failures.
+// Use this for investigation, not as the final production alert query.
+
+let lookback = 24h;
+
+DatabricksJobs
+| where TimeGenerated >= ago(lookback)
+| extend
+    JobId = tostring(column_ifexists("JobId", "")),
+    JobName = tostring(column_ifexists("JobName", "")),
+    RunId = tostring(column_ifexists("RunId", "")),
+    ActionName = tostring(column_ifexists("ActionName", ""))
+| where ActionName == "runFailed"
+| project TimeGenerated, JobId, JobName, RunId, ActionName
+| order by TimeGenerated desc

@@ -1,0 +1,24 @@
+{
+  "payload": {
+    "summary": "Databricks job reliability alert",
+    "severity": "error",
+    "source": "azure-monitor",
+    "component": "data-platform",
+    "group": "databricks",
+    "class": "job-consecutive-failure",
+    "custom_details": {
+      "environment": "PROD",
+      "job_id": "<JOB_ID>",
+      "job_name": "<JOB_NAME>",
+      "failure_count": "<FAILURE_COUNT>",
+      "last_failure_time": "<LAST_FAILURE_TIME>",
+      "last_run_id": "<LAST_RUN_ID>",
+      "alert_rule": "<ALERT_RULE_NAME>",
+      "monitor_condition": "<Fired|Resolved>",
+      "runbook": "<RUNBOOK_URL>",
+      "search_results": "<SEARCH_RESULTS_URL>"
+    }
+  },
+  "routing_key": "<PAGERDUTY_INTEGRATION_KEY>",
+  "event_action": "trigger"
+}
