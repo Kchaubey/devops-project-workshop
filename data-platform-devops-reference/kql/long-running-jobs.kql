@@ -1,0 +1,30 @@
+// Detect runs that started but have not emitted a terminal event.
+
+let lookback = 24h;
+let maxRuntime = 2h;
+
+let events =
+    DatabricksJobs
+    | where TimeGenerated >= ago(lookback)
+    | extend
+        JobId = tostring(column_ifexists("JobId", "")),
+        JobName = tostring(column_ifexists("JobName", "")),
+        RunId = tostring(column_ifexists("RunId", "")),
+        ActionName = tostring(column_ifexists("ActionName", ""));
+
+let starts =
+    events
+    | where ActionName == "runStart"
+    | project JobId, JobName, RunId, StartTime = TimeGenerated;
+
+let terminals =
+    events
+    | where ActionName in ("runSucceeded", "runFailed", "runCancelled")
+    | project JobId, RunId;
+
+starts
+| join kind=leftanti terminals on JobId, RunId
+| extend Runtime = now() - StartTime
+| where Runtime >= maxRuntime
+| project JobId, JobName, RunId, StartTime, Runtime
+| order by Runtime desc
